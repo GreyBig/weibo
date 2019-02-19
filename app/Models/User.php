@@ -1,14 +1,19 @@
 <?php
 
-namespace App;
+namespace App\Models;
 
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
-class User extends Authenticatable
+class User extends Authenticatable  // Authenticatable授权相关功能的引用
 {
-    use Notifiable;
+    use Notifiable;  // 消息通知相关功能引用
+
+    /**
+     * 指明要进行数据库交互的数据库表名称
+     * protected $table = 'users';
+     */
 
     /**
      * The attributes that are mass assignable.
