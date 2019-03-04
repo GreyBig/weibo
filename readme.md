@@ -188,7 +188,7 @@ User控制器中的store方法加一句：
     @endforeach
 default.blade.php中引入消息提醒视图。
 
-## 会话管理
+## 五、会话管理
 
 **登录认证流程操作流程**
 1. 访问登录页面，输入账号密码点击登录；
@@ -247,3 +247,55 @@ attempt执行的代码逻辑：
 3). 如果匹配后两个值不一致，则返回 false；
 3. 如果用户未找到，则返回 false。
 使用 `withInput()` 后模板里 `old('email')` 将能获取到上一次用户提交的内容，这样用户就无需再次输入邮箱等内容：
+
+**修改布局中的链接**
+Laravel 提供了 Auth::check() 方法用于判断当前用户是否已登录，已登录返回 true，未登录返回 false。
+layouts/_header.blade.php中
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container ">
+        <a class="navbar-brand" href="{{ route('home') }}">Weibo App</a>
+        <ul class="navbar-nav justify-content-end">
+        @if (Auth::check())
+            <li class="nav-item"><a class="nav-link" href="#">用户列表</a></li>
+            <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                {{ Auth::user()->name }}
+            </a>
+            <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <a class="dropdown-item" href="{{ route('users.show', Auth::user()) }}">个人中心</a>
+                <a class="dropdown-item" href="#">编辑资料</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" id="logout" href="#">
+                <form action="{{ route('logout') }}" method="POST">
+                    {{ csrf_field() }}
+                    {{ method_field('DELETE') }}
+                    <button class="btn btn-block btn-danger" type="submit" name="button">退出</button>
+                </form>
+                </a>
+            </div>
+            </li>
+        @else
+            <li class="nav-item"><a class="nav-link" href="{{ route('help') }}">帮助</a></li>
+            <li class="nav-item" ><a class="nav-link" href="{{ route('login') }}">登录</a></li>
+        @endif
+        </ul>
+    </div>
+    </nav>
+
+浏览器不支持发送 DELETE 请求，因此我们需要使用一个隐藏域来伪造 DELETE 请求。
+Blade 模板中使用 `method_field` 方法来创建隐藏域。
+对应的HTML代码：
+
+    <input type="hidden" name="_method" value="DELETE">
+
+这是我们点击用户名，，理应弹出的下拉菜单却没有任何响应。这是因为我们还没有引入 Bootstrap 的 JavaScript 组件库。
+
+layouts/default.blade.php的body中加入
+
+    <script src="{{ mix('js/app.js') }}"></script>
+
+**注册后自动登录**
+对用户控制器的 store 方法进行更改，让用户注册成功后自动登录。
+引入Auth;
+Auth::login($user);
