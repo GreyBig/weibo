@@ -1,6 +1,6 @@
 <p align="center"><img src="https://laravel.com/assets/img/components/logo-laravel.svg"></p>
 
-## 一、构建页面
+## 一、构建页面 </font>
 
 git checkout -b static-pages 创建一个分支
 
@@ -154,7 +154,7 @@ resources/views/shared/_errors.blade.php
 1. 将用户提交的信息存储到数据库，并重定向到其个人页面；
 2. 在网页顶部位置显示注册成功的提示信息；
    
-**保护用户并重定向**
+#### 保护用户并重定向
 User控制器中的store方法写入：
 
     $user = User::create([
@@ -170,7 +170,7 @@ User控制器中的store方法写入：
 这样获取：\$name = $request->name;
 获取所有：\$data = $request->all();</font>
 
-**消息提示**
+#### 消息提示
 User控制器中的store方法加一句：
 
     session()->flash('success', '欢迎，您将在这里开启一段新的旅程~');
@@ -190,7 +190,7 @@ default.blade.php中引入消息提醒视图。
 
 ## 五、会话管理
 
-**登录认证流程操作流程**
+#### 登录认证流程操作流程
 1. 访问登录页面，输入账号密码点击登录；
 2. 服务器对用户身份进行认证，认证通过后，记录登录状态并进行页面重定向；
 3. 登录成功后的用户，能够使用退出按钮来销毁当前登录状态；
@@ -200,7 +200,7 @@ PS：『记住我』功能
 
     git checkout -b login-logout
 
-**会话控制器:**
+#### 会话控制器
 
     php artisan make:controller SessionsController
 路由，包含三个动作
@@ -210,11 +210,11 @@ PS：『记住我』功能
     Route::post('login', 'SessionsController@store')->name('login');
     Route::delete('logout', 'SessionsController@destroy')->name('logout');
 
-**登录表单：**
+#### 登录表单
     会话控制器中加入 create 动作，并返回一个指定的登录视图
     新建一个登录视图，并加上表单信息。views/sessions/create.blade.php中
 
-**认证用户身份**
+#### 认证用户身份
 
     public function store(Request $request)
     {
@@ -226,7 +226,7 @@ PS：『记住我』功能
        return;
     }
 
-**Auth认证用户身份和重定向**
+#### Auth认证用户身份和重定向
 
 会话控制其中引入use Auth;
 在store方法中写入：
@@ -248,7 +248,7 @@ attempt执行的代码逻辑：
 3. 如果用户未找到，则返回 false。
 使用 `withInput()` 后模板里 `old('email')` 将能获取到上一次用户提交的内容，这样用户就无需再次输入邮箱等内容：
 
-**修改布局中的链接**
+#### 修改布局中的链接
 Laravel 提供了 Auth::check() 方法用于判断当前用户是否已登录，已登录返回 true，未登录返回 false。
 layouts/_header.blade.php中
 
@@ -295,12 +295,12 @@ layouts/default.blade.php的body中加入
 
     <script src="{{ mix('js/app.js') }}"></script>
 
-**注册后自动登录**
+#### 注册后自动登录
 对用户控制器的 store 方法进行更改，让用户注册成功后自动登录。
 引入Auth;
 Auth::login($user);
 
-**退出**
+#### 退出 
 Laravel 默认提供的 Auth::logout() 方法来实现用户的退出功能。
 会话控制器写入destroy方法：
 
@@ -311,7 +311,7 @@ Laravel 默认提供的 Auth::logout() 方法来实现用户的退出功能。
         return redirect('login');
     }
 
-**记住我**
+#### 记住我x
 登录视图中加入
 
     <div class="form-group">
@@ -328,7 +328,7 @@ Laravel 默认提供的 Auth::logout() 方法来实现用户的退出功能。
 ## 六、用户CRUD
 git checkout -b user-crud
 
-**编辑表单**
+#### 编辑表单
 用户控制器上加上编辑用户的操作:
 
     public function edit(User $user)
@@ -403,7 +403,7 @@ resources/sass/app.scss中
 顶部导航栏的编辑资料加上链接 
 `href="{{ route('users.edit', Auth::user()) }}"`
 
-**编辑功能**
+#### 编辑功能
 用户控制器写入update方法
 
     public function update(User $user, Request $request)
@@ -424,3 +424,72 @@ resources/sass/app.scss中
 
         return redirect()->route('users.show', $user);
     }
+
+#### 权限系统
+现在的应用存在两个巨大的安全隐患：
+1. 未登录用户可以访问 edit 和 update 动作
+2. 登录用户可以更新其它用户的个人信息
+
+#### 必须先登录
+在用户控制器中加上中间件：
+
+    public function __construct()
+    {
+        $this->middleware('auth', [            
+            'except' => ['show', 'create', 'store']
+        ]);
+    }
+__construct 是 PHP 的构造器方法，当一个类对象被创建之前该方法将会被调用。
+
+#### 用户只能编辑自己的资料
+当 id 为 1 的用户去尝试更新 id 为 2 的用户信息时，我们应该返回一个 403 禁止访问的异常。
+在 Laravel 中可以使用 <font color=#f4645f>授权策略 (Policy)</font> 来对用户的操作权限进行验证
+`$ php artisan make:policy UserPolicy`
+app/Policies/UserPolicy.php中写入：
+
+    public function update(User $currentUser, User $user)
+    {
+        return $currentUser->id === $user->id;
+    }
+app/Providers/AuthServiceProvider.php中将User模型指定授权策略UserPolicy
+`\App\Models\User::class  => \App\Policies\UserPolicy::class,`
+
+* 用户控制器中的edit和update方法都加上`$this->authorize('update', $user);`
+* 默认的 App\Http\Controllers\Controller 类包含了 Laravel 的 AuthorizesRequests trait
+此 trait 提供了 authorize 方法,它可以被用于快速授权一个指定的行为，当无权限运行该行为时会抛出 HttpException。
+* 第一个为授权策略的名称，第二个为进行授权验证的数据。
+* 这里 update 是指授权类里的 update 授权方法
+
+#### 友好的转向
+未登录用户访问编辑页面时，跳转到登录页面，该用户登录成功后跳转到编辑页面。
+会话控制器中：
+
+       if (Auth::attempt($credentials, $request->has('remember'))) {
+           session()->flash('success', '欢迎回来！');
+           $fallback = route('users.show', Auth::user());
+           return redirect()->intended($fallback);
+       } ...
+
+#### 注册与登录页面访问限制
+Auth 中间件提供的 guest 来指定一些只允许未登录用户访问的动作
+会话控制器中：
+
+    public function __construct()
+    {
+        $this->middleware('guest', [
+            'only' => ['create']
+        ]);
+    }
+
+用户控制器中：
+
+        $this->middleware('guest', [
+            'only' => ['create']
+        ]);
+
+app/Http/Middleware/RedirectIfAuthenticated.php中
+
+        if (Auth::guard($guard)->check()) {
+            session()->flash('info', '您已登录，无需再次操作。');
+            return redirect('/');
+        }
