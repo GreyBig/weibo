@@ -299,3 +299,14 @@ layouts/default.blade.php的body中加入
 对用户控制器的 store 方法进行更改，让用户注册成功后自动登录。
 引入Auth;
 Auth::login($user);
+
+**退出**
+Laravel 默认提供的 Auth::logout() 方法来实现用户的退出功能。
+会话控制器写入destroy方法：
+
+    public function destroy()
+    {
+        Auth::logout();
+        session()->flash('success', '您已成功退出！');
+        return redirect('login');
+    }
