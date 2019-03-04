@@ -310,3 +310,17 @@ Laravel 默认提供的 Auth::logout() 方法来实现用户的退出功能。
         session()->flash('success', '您已成功退出！');
         return redirect('login');
     }
+
+**记住我**
+登录视图中加入
+
+    <div class="form-group">
+    <div class="form-check">
+        <input type="checkbox" class="form-check-input" name="remember" id="exampleCheck1">
+        <label class="form-check-label" for="exampleCheck1">记住我</label>
+    </div>
+    </div>
+
+会话控制器中的 store 方法，为 Auth::attempt() 添加『记住我』参数。
+
+    Auth::attempt($credentials, $request->has('remember'))
