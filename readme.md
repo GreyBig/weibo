@@ -187,3 +187,63 @@ User控制器中的store方法加一句：
     @endif
     @endforeach
 default.blade.php中引入消息提醒视图。
+
+## 会话管理
+
+**登录认证流程操作流程**
+1. 访问登录页面，输入账号密码点击登录；
+2. 服务器对用户身份进行认证，认证通过后，记录登录状态并进行页面重定向；
+3. 登录成功后的用户，能够使用退出按钮来销毁当前登录状态；
+PS：『记住我』功能
+
+#### 会话
+
+    git checkout -b login-logout
+
+**会话控制器:**
+
+    php artisan make:controller SessionsController
+路由，包含三个动作
+显示登录页面、创建新会话（登录）、销毁会话（退出登录）
+
+    Route::get('login', 'SessionsController@create')->name('login');
+    Route::post('login', 'SessionsController@store')->name('login');
+    Route::delete('logout', 'SessionsController@destroy')->name('logout');
+
+**登录表单：**
+    会话控制器中加入 create 动作，并返回一个指定的登录视图
+    新建一个登录视图，并加上表单信息。views/sessions/create.blade.php中
+
+**认证用户身份**
+
+    public function store(Request $request)
+    {
+       $credentials = $this->validate($request, [
+           'email' => 'required|email|max:255',
+           'password' => 'required'
+       ]);
+
+       return;
+    }
+
+**Auth认证用户身份和重定向**
+
+会话控制其中引入use Auth;
+在store方法中写入：
+
+       if (Auth::attempt($credentials)) {
+           session()->flash('success', '欢迎回来！');
+           return redirect()->route('users.show', [Auth::user()]);
+       } else {
+           session()->flash('danger', '很抱歉，您的邮箱和密码不匹配');
+           return redirect()->back()->withInput();
+       }
+attempt执行的代码逻辑：
+
+1. 使用 email 字段的值在数据库中查找；
+2. 如果用户被找到：
+1). 先将传参的 password 值进行哈希加密，然后与数据库中 password 字段中已加密的密码进行匹配；
+2). 如果匹配后两个值完全一致，会创建一个『会话』给通过认证的用户。会话在创建的同时，也会种下一个名为 laravel_session 的 HTTP Cookie，以此 Cookie 来记录用户登录状态，最终返回 true；
+3). 如果匹配后两个值不一致，则返回 false；
+3. 如果用户未找到，则返回 false。
+使用 `withInput()` 后模板里 `old('email')` 将能获取到上一次用户提交的内容，这样用户就无需再次输入邮箱等内容：
