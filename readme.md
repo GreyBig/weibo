@@ -324,3 +324,103 @@ Laravel 默认提供的 Auth::logout() 方法来实现用户的退出功能。
 会话控制器中的 store 方法，为 Auth::attempt() 添加『记住我』参数。
 
     Auth::attempt($credentials, $request->has('remember'))
+
+## 六、用户CRUD
+git checkout -b user-crud
+
+**编辑表单**
+用户控制器上加上编辑用户的操作:
+
+    public function edit(User $user)
+    {
+        return view('users.edit', compact('user'));
+    }
+
+views/users/edit.blade.php中
+
+    @extends('layouts.default')
+    @section('title', '更新个人资料')
+
+    @section('content')
+    <div class="offset-md-2 col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>更新个人资料</h5>
+            </div>
+            <div class="card-body">
+                @include('shared._errors')
+
+                <div class="gravatar_edit">
+                    <a href="http://gravatar.com/emails" target="_blank">
+                        <img src="{{ $user->gravatar('200') }}" alt="{{ $user->name }}" class="gravatar"/>
+                    </a>
+                </div>
+
+                <form method="POST" action="{{ route('users.update', $user->id )}}">
+                <!-- <form method="POST" action="http://weibo.test/users/1"> -->
+                    {{ method_field('PATCH') }}
+                    <!-- <input type="hidden" name="_method" value="PATCH"> -->
+                    {{ csrf_field() }}
+
+                    <div class="form-group">
+                    <label for="name">名称：</label>
+                    <input type="text" name="name" class="form-control" value="{{ $user->name }}">
+                    </div>
+
+                    <div class="form-group">
+                    <label for="email">邮箱：</label>
+                    <input type="text" name="email" class="form-control" value="{{ $user->email }}" disabled>
+                    </div>
+
+                    <div class="form-group">
+                    <label for="password">密码：</label>
+                    <input type="password" name="password" class="form-control" value="{{ old('password') }}">
+                    </div>
+
+                    <div class="form-group">
+                    <label for="password_confirmation">确认密码：</label>
+                    <input type="password" name="password_confirmation" class="form-control" value="{{ old('password_confirmation') }}">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">更新</button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+    @stop
+resources/sass/app.scss中
+
+    .gravatar_edit {
+    margin: 15px auto;
+    text-align: center;
+    .gravatar {
+        float: none;
+        max-width: 100px;
+    }
+    }
+
+顶部导航栏的编辑资料加上链接 
+`href="{{ route('users.edit', Auth::user()) }}"`
+
+**编辑功能**
+用户控制器写入update方法
+
+    public function update(User $user, Request $request)
+    {
+        $this->validate($request, [
+            'name' => 'required|max:50',
+            'password' => 'nullable|confirmed|min:6' // nullable: 提供空白密码时也会通过验证
+        ]);
+
+        $data = [];
+        $data['name'] = $request->name;
+        if ($request->password) {
+            $data['password'] = bcrypt($request->password);
+        }
+        $user->update($data);
+
+        session()->flash('success', '个人资料更新成功！');
+
+        return redirect()->route('users.show', $user);
+    }
