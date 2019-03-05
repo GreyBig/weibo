@@ -590,3 +590,74 @@ index.blade.php中
     <div class="mt-3">
         {!! $users->render() !!}
     </div>
+
+**使用局部视图重构**
+将单个用户视图抽离成一个完整的局部视图。局部视图放入users/_user.blade.php
+
+#### 删除用户
+* 用户的删除只能通过管理员来操作
+* 用户表加上管理员字段用来判定该用户是否为管理员
+* 将管理员身份授权给某个指定用户，让其得到删除用户的权限
+* 需要在用户列表页面加上删除按钮，只有当我们登录管理员账号时才能看到删除按钮
+
+#### 管理员
+`$ php artisan make:migration add_is_admin_to_users_table --table=users`
+
+    public function up()
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->boolean('is_admin')->default(false);
+        });
+    }
+
+    public function down()
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn('is_admin');
+        });
+    }
+`$ php artisan migrate`
+UsersTableSeeder.php中将第一个用户设为管理员：
+`$user->is_admin = true;`
+`$ php artisan migrate:refresh --seed`  // 对数据库进行重置和填充
+`$ php artisan tinker`
+`>>> App\Models\User::first()`  查看id为1的用户
+
+#### destroy 动作
+1. 只有当前登录用户为管理员才能执行删除操作；
+2. 删除的用户对象不是自己（即使是管理员也不能自己删自己）。
+app/Policies/UserPolicy.php
+
+    public function destroy(User $currentUser, User $user)
+    {
+        return $currentUser->is_admin && $currentUser->id !== $user->id;
+    }
+resources/views/users/_user.blade.php中：
+
+    <div class="list-group-item">
+        <img class="mr-3" src="{{ $user->gravatar() }}" alt="{{ $user->name }}" width=32>
+        <a href="{{ route('users.show', $user) }}">
+            {{ $user->name }}
+        </a>
+        <!-- 管理员才看得到下面删除用户按钮 -->
+        @can('destroy', $user) 
+            <form action="{{ route('users.destroy', $user->id) }}" method="post" class="float-right">
+            {{ csrf_field() }}
+            {{ method_field('DELETE') }}
+            <button type="submit" class="btn btn-sm btn-danger delete-btn">删除</button>
+            </form>
+        @endcan
+    </div>
+
+为用户控制器添加基本的用户删除动作，
+对删除动作加上授权策略，只允许已登录的 **管理员** 进行删除操作。
+
+    public function destroy(User $user)
+    {
+        // 使用 authorize 方法来对删除操作进行授权验证, destroy在授权策略在Userpolicy中已经定义好
+        $this->authorize('destroy', $user);
+        $user->delete();
+        session()->flash('success', '成功删除用户！');
+        return back();
+    }
+
