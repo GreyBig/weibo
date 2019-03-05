@@ -493,3 +493,100 @@ app/Http/Middleware/RedirectIfAuthenticated.php中
             session()->flash('info', '您已登录，无需再次操作。');
             return redirect('/');
         }
+
+#### 列出所有用户
+
+**用户列表**
+用户控制器中的Auth中间件新增index来允许游客访问，并加入index动作
+
+    public function index()
+    {
+        $users = User::all();
+        return view('users.index', compact('users'));
+    }
+视图，views/users/index.blade.php中：
+
+    @extends('layouts.default')
+    @section('title', '所有用户')
+
+    @section('content')
+    <div class="offset-md-2 col-md-8">
+    <h2 class="mb-4 text-center">所有用户</h2>
+    <div class="list-group list-group-flush">
+        @foreach ($users as $user)
+        <div class="list-group-item">
+            <img class="mr-3" src="{{ $user->gravatar() }}" alt="{{ $user->name }}" width=32>
+            <a href="{{ route('users.show', $user) }}">
+            {{ $user->name }}
+            </a>
+        </div>
+        @endforeach
+    </div>
+    </div>
+    @stop
+
+顶部导航加链接，在_header.blade.php中加入{{ route('users.index') }}
+**问题：**
+1. 注册用户太少；
+2. 用户列表页不支持分页浏览，用户量大的时候会影响性能和用户体验；
+
+#### 示例用户
+假数据的生成分为两个阶段：
+1. 对要生成假数据的模型指定字段进行赋值 - 『**模型工厂**』；
+2. 批量生成假数据模型 - 『**数据填充**』；
+#### 模型工厂
+Laravel 默认为我们集成了 Faker 扩展包，使用该扩展包可以让我们很方便的生成一些假数据。
+在UserFactory.php中添加：
+
+    'created_at' => $date_time,
+    'updated_at' => $date_time,
+#### 数据填充
+`$ php artisan make:seeder UsersTableSeeder`
+database/seeds/UsersTableSeeder.php中
+
+        use Illuminate\Database\Seeder;
+        use App\Models\User;
+
+        class UsersTableSeeder extends Seeder
+        {
+            public function run()
+            {
+                $users = factory(User::class)->times(50)->make();
+                User::insert($users->makeVisible(['password', 'remember_token'])->toArray());
+
+                // 对第一位用户的信息进行了更新，方便后面我们使用此账号登录
+                $user = User::find(1);
+                $user->name = 'Summer';
+                $user->email = 'summer@example.com';
+                $user->save();
+            } 
+        }
+
+database/seeds/DatabaseSeeder.php中
+
+    use Illuminate\Database\Seeder;
+    use Illuminate\Database\Eloquent\Model;
+
+    class DatabaseSeeder extends Seeder
+    {
+        public function run()
+        {
+            Model::unguard();
+
+            $this->call(UsersTableSeeder::class);
+
+            Model::reguard();
+        }
+    }
+`$ php artisan migrate:refresh`
+`$ php artisan db:seed --class=UsersTableSeeder` 单独执行，不加就全部
+
+#### 分页
+
+用户控制器中`User::all()`替换成`User::paginate(10)`
+用户列表页上渲染分页链接使用 `{!! $users->render() !!}`
+index.blade.php中
+
+    <div class="mt-3">
+        {!! $users->render() !!}
+    </div>
