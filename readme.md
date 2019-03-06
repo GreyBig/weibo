@@ -114,7 +114,7 @@ php artisan migrate:refresh
 创建表单页面views/users/create.blade.php
 使用bootstrap的card类和form表单写页面,并提交给User控制器的store方法,表单里面加{{ csrf_field() }}
     
-    <form method="POST" action="{{ route('users.store')}}">
+    <form method="POST" action="{{ route('users.store')}}"></form>
 
 #### 用户数据验证
 User控制器中添加store方法
@@ -187,6 +187,7 @@ User控制器中的store方法加一句：
     @endif
     @endforeach
 default.blade.php中引入消息提醒视图。
+
 
 ## 五、会话管理
 
@@ -278,10 +279,65 @@ layouts/_header.blade.php中
         @else
             <li class="nav-item"><a class="nav-link" href="{{ route('help') }}">帮助</a></li>
             <li class="nav-item" ><a class="nav-link" href="{{ route('login') }}">登录</a></li>
-        @endif
-        </ul>
-    </div>
-    </nav>
+
+#### 登录认证流程操作流程
+1. 访问登录页面，输入账号密码点击登录；
+2. 服务器对用户身份进行认证，认证通过后，记录登录状态并进行页面重定向；
+3. 登录成功后的用户，能够使用退出按钮来销毁当前登录状态；
+PS：『记住我』功能
+
+#### 会话
+
+    git checkout -b login-logout
+
+#### 会话控制器
+
+    php artisan make:controller SessionsController
+路由，包含三个动作
+显示登录页面、创建新会话（登录）、销毁会话（退出登录）
+
+    Route::get('login', 'SessionsController@create')->name('login');
+    Route::post('login', 'SessionsController@store')->name('login');
+    Route::delete('logout', 'SessionsController@destroy')->name('logout');
+
+#### 登录表单
+    会话控制器中加入 create 动作，并返回一个指定的登录视图
+    新建一个登录视图，并加上表单信息。views/sessions/create.blade.php中
+
+#### 认证用户身份
+
+    public function store(Request $request)
+    {
+       $credentials = $this->validate($request, [
+           'email' => 'required|email|max:255',
+           'password' => 'required'
+       ]);
+
+       return;
+    }
+
+#### Auth认证用户身份和重定向
+
+会话控制其中引入use Auth;
+在store方法中写入：
+
+       if (Auth::attempt($credentials)) {
+           session()->flash('success', '欢迎回来！');
+           return redirect()->route('users.show', [Auth::user()]);
+       } else {
+           session()->flash('danger', '很抱歉，您的邮箱和密码不匹配');
+           return redirect()->back()->withInput();
+       }
+attempt执行的代码逻辑：
+
+1. 使用 email 字段的值在数据库中查找；
+2. 如果用户被找到：
+1). 先将传参的 password 值进行哈希加密，然后与数据库中 password 字段中已加密的密码进行匹配；
+2). 如果匹配后两个值完全一致，会创建一个『会话』给通过认证的用户。会话在创建的同时，也会种下一个名为 laravel_session 的 HTTP Cookie，以此 Cookie 来记录用户登录状态，最终返回 true；
+3). 如果匹配后两个值不一致，则返回 false；
+3. 如果用户未找到，则返回 false。
+使用 `withInput()` 后模板里 `old('email')` 将能获取到上一次用户提交的内容，这样用户就无需再次输入邮箱等内容：
+
 
 浏览器不支持发送 DELETE 请求，因此我们需要使用一个隐藏域来伪造 DELETE 请求。
 Blade 模板中使用 `method_field` 方法来创建隐藏域。
@@ -324,6 +380,8 @@ Laravel 默认提供的 Auth::logout() 方法来实现用户的退出功能。
 会话控制器中的 store 方法，为 Auth::attempt() 添加『记住我』参数。
 
     Auth::attempt($credentials, $request->has('remember'))
+
+
 
 ## 六、用户CRUD
 git checkout -b user-crud
@@ -628,10 +686,10 @@ UsersTableSeeder.php中将第一个用户设为管理员：
 2. 删除的用户对象不是自己（即使是管理员也不能自己删自己）。
 app/Policies/UserPolicy.php
 
-    public function destroy(User $currentUser, User $user)
-    {
-        return $currentUser->is_admin && $currentUser->id !== $user->id;
-    }
+        public function destroy(User $currentUser, User $user)
+        {
+            return $currentUser->is_admin && $currentUser->id !== $user->id;
+        }
 resources/views/users/_user.blade.php中：
 
     <div class="list-group-item">
@@ -661,3 +719,40 @@ resources/views/users/_user.blade.php中：
         return back();
     }
 
+## 七、邮件发送
+作用：
+* 用户账号激活 —— 用于激活新注册的用户；
+* 用户密码重设 —— 帮助用户找回密码；
+
+**账号激活**，整个激活流程如下：
+1. 用户注册成功后，自动生成激活令牌；
+2. 将激活令牌以链接的形式附带在注册邮件里面，并将邮件发送到用户的注册邮箱上；
+3. 用户点击注册链接跳到指定路由，路由收到激活令牌参数后映射给相关控制器动作处理；
+4. 控制器拿到激活令牌并进行验证，验证通过后对该用户进行激活，并将其激活状态设置为已激活；
+5. 用户激活成功，自动登录；
+
+**密码重设**的步骤如下：
+1. 用户点击重设密码链接并跳转到重设密码页面；
+2. 在重设密码页面输入邮箱信息并提交；
+3. 控制器通过该邮箱查找到指定用户并为该用户生成一个密码令牌，接着将该令牌以链接的形式发送4. 到用户提交的邮箱上；
+5. 用户查看自己个人邮箱，点击重置密码链接跳转到重置密码页面；
+6. 用户在该页面输入自己的邮箱和密码并提交；
+7. 控制器对用户的邮箱和密码重置令牌进行匹配，匹配成功则更新用户密码；
+
+#### 密码重设
+Laravel已经有保存密码重置令牌的数据表
+有三个字段 email, token, created_at，分别用于生成用户邮箱、密码重置令牌、密码重置令牌的创建时间，并为邮箱和密码重置令牌加上了索引
+
+Laravel 将密码重设功能相关的逻辑代码都放在了 ForgotPasswordController 和 ResetPasswordController 中
+
+routes/web.php
+
+    Route::get('password/reset', 'Auth\ForgotPasswordController@showLinkRequestForm')->name('password.request');
+    Route::post('password/email', 'Auth\ForgotPasswordController@sendResetLinkEmail')->name('password.email');
+    Route::get('password/reset/{token}', 'Auth\ResetPasswordController@showResetForm')->name('password.reset');
+    Route::post('password/reset', 'Auth\ResetPasswordController@reset')->name('password.update');
+
+修改登录页面
+resources/views/sessions/create.blade.php
+
+    <label for="password">密码（<a href="{{ route('password.request') }}">忘记密码</a>）：</label>
